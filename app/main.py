@@ -11,6 +11,10 @@ class AccountCreate(BaseModel):
     owner: str = Field(min_length=1, max_length=50)
 
 
+class DepositCreate(BaseModel):
+    amount: int = Field(gt=0, strict=True)
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -30,4 +34,13 @@ def get_account(account_id: int):
     if account_id not in accounts:
         raise HTTPException(status_code=404, detail="Account not found")
 
+    return accounts[account_id]
+
+
+@app.post("/accounts/{account_id}/deposits")
+def create_deposit(account_id: int, data: DepositCreate):
+    if account_id not in accounts:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    accounts[account_id]["balance"] += data.amount
     return accounts[account_id]
