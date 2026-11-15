@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
+from app.database import init_db
 
 app = FastAPI()
+init_db()
 accounts = {}
 next_id = 1
 
