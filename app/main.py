@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
+from app.database import init_db, get_connection
 
 app = FastAPI()
-accounts = {}
-next_id = 1
+init_db()
 
 
 class AccountCreate(BaseModel):
@@ -22,25 +22,48 @@ def health_check():
 
 @app.post("/accounts", status_code=201)
 def create_account(data: AccountCreate):
-    global next_id
-    account = {"id": next_id, "owner": data.owner, "balance": 0}
-    accounts[next_id] = account
-    next_id += 1
-    return account
+    conn = get_connection()
+    cur = conn.execute("INSERT INTO accounts (owner) VALUES (?)", (data.owner,))
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, owner, balance FROM accounts WHERE id = ?", (cur.lastrowid,)
+    ).fetchone()  # רק שורה אחת
+    conn.close()
+    return dict(row)
 
 
 @app.get("/accounts/{account_id}")
 def get_account(account_id: int):
-    if account_id not in accounts:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, owner, balance FROM accounts where id = ?", (account_id,)
+    ).fetchone()
+    conn.close()
+    if row is None:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    return accounts[account_id]
+    return dict(row)
 
 
 @app.post("/accounts/{account_id}/deposits")
 def create_deposit(account_id: int, data: DepositCreate):
-    if account_id not in accounts:
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT id, owner, balance FROM accounts where id = ?", (account_id,)
+    ).fetchone()
+
+    if row is None:
+        conn.close()
         raise HTTPException(status_code=404, detail="Account not found")
 
-    accounts[account_id]["balance"] += data.amount
-    return accounts[account_id]
+    conn.execute(
+        "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+        (data.amount, account_id),
+    )
+
+    ret = conn.execute(
+        "SELECT id, owner, balance FROM accounts where id = ?", (account_id,)
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    return dict(ret)
