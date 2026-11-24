@@ -4,9 +4,6 @@ from app.database import init_db, get_connection
 
 app = FastAPI()
 init_db()
-accounts = {}  # מסד נתונים זמני, המפתח הוא id
-# והערך הוא החשבון כולו
-next_id = 1  # המספר שיקבל החשבון הבא
 
 
 class AccountCreate(BaseModel):
