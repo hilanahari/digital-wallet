@@ -37,10 +37,13 @@ def create_account(data: AccountCreate):
 
 @app.get("/accounts/{account_id}")
 def get_account(account_id: int):
-    if account_id not in accounts:
+    conn = get_connection()
+    row = conn.execute("SELECT id, owner, balance FROM accounts where id = ?", (account_id, )).fetchone()
+    conn.close()
+    if row is None:
         raise HTTPException(status_code=404, detail="Account not found")
-
-    return accounts[account_id]
+    
+    return dict(row)
 
 
 @app.post("/accounts/{account_id}/deposits")
