@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
-from app.database import init_db
+from app.database import init_db, get_connection
 
 app = FastAPI()
 init_db()
-accounts = {}
-next_id = 1
+accounts = {}  # מסד נתונים זמני, המפתח הוא id
+# והערך הוא החשבון כולו
+next_id = 1  # המספר שיקבל החשבון הבא
 
 
 class AccountCreate(BaseModel):
@@ -24,11 +25,14 @@ def health_check():
 
 @app.post("/accounts", status_code=201)
 def create_account(data: AccountCreate):
-    global next_id
-    account = {"id": next_id, "owner": data.owner, "balance": 0}
-    accounts[next_id] = account
-    next_id += 1
-    return account
+    conn = get_connection()
+    cur = conn.execute("INSERT INTO accounts (owner) VALUES (?)", (data.owner,))
+    conn.commit()
+    row = conn.execute(
+        "SELECT id, owner, balance FROM accounts WHERE id = ?", (cur.lastrowid,)
+    ).fetchone()  # רק שורה אחת
+    conn.close()
+    return dict(row)
 
 
 @app.get("/accounts/{account_id}")
