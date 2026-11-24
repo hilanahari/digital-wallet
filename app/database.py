@@ -4,9 +4,10 @@ DB_PATH = "wallet.db"
 
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    conn = sqlite3.connect(DB_PATH)  # מתחבר לקובץ, ויוצר אותו אם הוא לא קיים
+    conn.row_factory = sqlite3.Row  # שלא יוחזר  כ- tuple
+    conn.execute("PRAGMA foreign_keys = ON") # מוודאת שהקשרים שאנו יוצרים בין טבלאות נאכפים בזמן אמת 
+    
     return conn
 
 
@@ -30,5 +31,5 @@ def init_db():
  	        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
     """)
-    conn.commit()
-    conn.close()
+    conn.commit()  # שומר את השינויים בקובץ בפועל
+    conn.close()  # סוגר את החיבור
