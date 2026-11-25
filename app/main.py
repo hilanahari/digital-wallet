@@ -15,6 +15,12 @@ class DepositCreate(BaseModel):
     amount: int = Field(gt=0, strict=True)
 
 
+class TransferCreate(BaseModel):
+    from_account_id: int = Field(gt=0, strict=True)
+    to_account_id: int = Field(gt=0, strict=True)
+    amount: int = Field(gt=0, strict=True)
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -62,8 +68,40 @@ def create_deposit(account_id: int, data: DepositCreate):
     )
 
     ret = conn.execute(
-        "SELECT id, owner, balance FROM accounts where id = ?", (account_id,)
+        "SELECT id, owner, balance FROM accounts WHERE id = ?", (account_id,)
     ).fetchone()
     conn.commit()
     conn.close()
+    return dict(ret)
+
+
+@app.post("/transfers")
+def create_transfer(data: TransferCreate):
+    conn = get_connection()
+    conn.execute(
+        "UPDATE accounts SET balance = balance - ? where id = ?",
+        (data.amount, data.from_account_id),
+    )
+    conn.execute(
+        "UPDATE accounts SET balance = balance + ? where id = ?",
+        (data.amount, data.to_account_id),
+    )
+
+    conn.execute(
+        "INSERT INTO transactions (account_id, counterparty_id, type, amount) VALUES (?, ?, 'transfer_out', ?)",
+        (data.from_account_id, data.to_account_id, -data.amount),
+    )
+
+    conn.execute(
+        "INSERT INTO transactions (account_id, counterparty_id, type, amount) VALUES (?, ?, 'transfer_in', ?)",
+        (data.to_account_id, data.from_account_id, data.amount),
+    )
+
+    ret = conn.execute(
+        "SELECT id, owner, balance FROM accounts WHERE id = ?", (data.from_account_id,)
+    ).fetchone()
+
+    conn.commit()
+    conn.close()
+
     return dict(ret)
