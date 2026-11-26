@@ -1,9 +1,30 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from app.database import init_db, get_connection
+from app.exceptions import (
+    AccountNotFoundError,
+    SameAccountError,
+    InsufficientFundsError,
+)
 
 app = FastAPI()
 init_db()
+
+
+@app.exception_handler(SameAccountError)
+def same_account_handler(request: Request, exc: SameAccountError):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(AccountNotFoundError)
+def not_found_handler(request: Request, exc: AccountNotFoundError):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(InsufficientFundsError)
+def insufficient_funds_handler(request: Request, exc: InsufficientFundsError):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 class AccountCreate(BaseModel):
@@ -78,9 +99,7 @@ def create_deposit(account_id: int, data: DepositCreate):
 @app.post("/transfers")
 def create_transfer(data: TransferCreate):
     if data.from_account_id == data.to_account_id:
-        raise HTTPException(
-            status_code=400, detail="Cannot transfer to the same account"
-        )
+        raise SameAccountError("Cannot transfer to the same account")
 
     conn = get_connection()
 
@@ -91,7 +110,7 @@ def create_transfer(data: TransferCreate):
         ).fetchone()
 
         if from_account_row is None:
-            raise HTTPException(status_code=404, detail="Source account not found")
+            raise AccountNotFoundError("Source account not found")
 
         to_account_row = conn.execute(
             "SELECT id, owner, balance FROM accounts where id = ?",
@@ -99,10 +118,10 @@ def create_transfer(data: TransferCreate):
         ).fetchone()
 
         if to_account_row is None:
-            raise HTTPException(status_code=404, detail="Target account not found")
+            raise AccountNotFoundError("Target account not found")
 
         if from_account_row["balance"] < data.amount:
-            raise HTTPException(status_code=400, detail="Insufficient funds")
+            raise InsufficientFundsError("Insufficient funds")
 
         conn.execute(
             "UPDATE accounts SET balance = balance - ? where id = ?",
