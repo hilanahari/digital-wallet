@@ -77,8 +77,33 @@ def create_deposit(account_id: int, data: DepositCreate):
 
 @app.post("/transfers")
 def create_transfer(data: TransferCreate):
+    if data.from_account_id == data.to_account_id:
+        raise HTTPException(
+            status_code=400, detail="Cannot transfer to the same account"
+        )
+
     conn = get_connection()
+
     try:
+        from_account_row = conn.execute(
+            "SELECT id, owner, balance FROM accounts where id = ?",
+            (data.from_account_id,),
+        ).fetchone()
+
+        if from_account_row is None:
+            raise HTTPException(status_code=404, detail="Source account not found")
+
+        to_account_row = conn.execute(
+            "SELECT id, owner, balance FROM accounts where id = ?",
+            (data.to_account_id,),
+        ).fetchone()
+
+        if to_account_row is None:
+            raise HTTPException(status_code=404, detail="Target account not found")
+
+        if from_account_row["balance"] < data.amount:
+            raise HTTPException(status_code=400, detail="Insufficient funds")
+
         conn.execute(
             "UPDATE accounts SET balance = balance - ? where id = ?",
             (data.amount, data.from_account_id),
