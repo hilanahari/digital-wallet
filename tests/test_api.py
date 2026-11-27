@@ -35,3 +35,24 @@ def test_get_missing_account(client):
     response = client.get("/accounts/99")
     assert response.status_code == 404
     assert response.json() == {"detail": "Account not found"}
+
+
+def test_deposit(client):
+    client.post("/accounts", json={"owner": "Hila"})
+    response = client.post("/accounts/1/deposits", json={"amount": 5000})
+    assert response.status_code == 200
+    assert response.json() == {"id": 1, "owner": "Hila", "balance": 5000}
+
+
+def test_deposit_negative_amount(client):
+    client.post("/accounts", json={"owner": "Hila"})
+    response = client.post("/accounts/1/deposits", json={"amount": -500})
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["type"] == "greater_than"
+
+
+def test_deposit_missing_account(client):
+    client.post("/accounts", json={"owner": "Hila"})
+    response = client.post("/accounts/99/deposits", json={"amount": 5000})
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Account not found"}
